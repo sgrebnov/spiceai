@@ -338,3 +338,12 @@ LIMIT 100;
 | [q67.sql](tpcds/q67.sql) | [q70.sql](tpcds/q70.sql) |
 | [q77.sql](tpcds/q77.sql) | [q80.sql](tpcds/q80.sql) |
 | [q86.sql](tpcds/q86.sql) |                          |
+
+### SQLite does not support `stddev`
+
+**Limitation**: SQLite Data Accelerator does not support the `stddev` (standard deviation) function. There is an error `no such function: stddev` when running the following TPC-DS queries:
+
+| **Affected queries**     |                          |
+| ------------------------ | ------------------------ |
+| [q17.sql](tpcds/q17.sql) | [q29.sql](tpcds/q29.sql) |
+| [q35.sql](tpcds/q35.sql) | [q74.sql](tpcds/q74.sql) |
