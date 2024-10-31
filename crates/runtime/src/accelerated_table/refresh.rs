@@ -23,6 +23,7 @@ use crate::accelerated_table::refresh_task::RefreshTask;
 use crate::component::dataset::acceleration::RefreshMode;
 use crate::component::dataset::TimeFormat;
 use crate::dataaccelerator::spice_sys::dataset_checkpoint::DatasetCheckpoint;
+use crate::federated_table::FederatedTable;
 use crate::status;
 use arrow::datatypes::Schema;
 use cache::QueryResultsCacheProvider;
@@ -298,7 +299,7 @@ pub(crate) enum AccelerationRefreshMode {
 pub struct Refresher {
     runtime_status: Arc<status::RuntimeStatus>,
     dataset_name: TableReference,
-    federated: Arc<dyn TableProvider>,
+    federated: Arc<FederatedTable>,
     refresh: Arc<RwLock<Refresh>>,
     accelerator: Arc<dyn TableProvider>,
     cache_provider: Option<Arc<QueryResultsCacheProvider>>,
@@ -313,7 +314,7 @@ impl Refresher {
     pub(crate) fn new(
         runtime_status: Arc<status::RuntimeStatus>,
         dataset_name: TableReference,
-        federated: Arc<dyn TableProvider>,
+        federated: Arc<FederatedTable>,
         refresh: Arc<RwLock<Refresh>>,
         accelerator: Arc<dyn TableProvider>,
     ) -> Self {
@@ -666,10 +667,11 @@ mod tests {
         let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)])
             .expect("data should be created");
 
-        let federated = Arc::new(
+        let mem_table = Arc::new(
             MemTable::try_new(Arc::clone(&schema), vec![vec![batch]])
                 .expect("mem table should be created"),
         );
+        let federated = Arc::new(FederatedTable::new(mem_table));
 
         let arr = StringArray::from(existing_data);
 
@@ -867,10 +869,11 @@ mod tests {
             let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)])
                 .expect("data should be created");
 
-            let federated = Arc::new(
+            let mem_table = Arc::new(
                 MemTable::try_new(Arc::clone(&schema), vec![vec![batch]])
                     .expect("mem table should be created"),
             );
+            let federated = Arc::new(FederatedTable::new(mem_table));
 
             let arr = StringArray::from(existing_data);
 
@@ -1012,10 +1015,11 @@ mod tests {
             let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)])
                 .expect("data should be created");
 
-            let federated = Arc::new(
+            let mem_table = Arc::new(
                 MemTable::try_new(Arc::clone(&schema), vec![vec![batch]])
                     .expect("mem table should be created"),
             );
+            let federated = Arc::new(FederatedTable::new(mem_table));
 
             let arr = UInt64Array::from(existing_data);
 
@@ -1208,9 +1212,10 @@ mod tests {
                 data = vec![vec![batch.clone()], vec![batch]];
             }
 
-            let federated = Arc::new(
+            let mem_table = Arc::new(
                 MemTable::try_new(Arc::clone(&schema), data).expect("mem table should be created"),
             );
+            let federated = Arc::new(FederatedTable::new(mem_table));
 
             let arr = UInt64Array::from(existing_data);
             let batch =
