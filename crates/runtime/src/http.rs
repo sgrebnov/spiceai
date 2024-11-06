@@ -16,12 +16,14 @@ limitations under the License.
 
 use std::{fmt::Debug, sync::Arc};
 
+use auth::AuthLayer;
 use axum::Router;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto::Builder,
     service::TowerToHyperService,
 };
+use runtime_auth::HttpAuth;
 use snafu::prelude::*;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio_rustls::TlsAcceptor;
@@ -34,6 +36,7 @@ use crate::{
     Runtime,
 };
 
+mod auth;
 mod metrics;
 mod routes;
 mod v1;
@@ -54,6 +57,7 @@ pub(crate) async fn start<A>(
     rt: Arc<Runtime>,
     config: Arc<config::Config>,
     tls_config: Option<Arc<TlsConfig>>,
+    auth_provider: Option<Arc<dyn HttpAuth + Send + Sync>>,
 ) -> Result<()>
 where
     A: ToSocketAddrs + Debug,
@@ -63,7 +67,7 @@ where
         Arc::clone(&rt.embeds),
         parse_explicit_primary_keys(Arc::clone(&rt.app)).await,
     ));
-    let routes = routes::routes(&rt, config, vsearch);
+    let routes = routes::routes(&rt, config, vsearch, auth_provider.map(AuthLayer::new));
 
     let listener = TcpListener::bind(&bind_address)
         .await
