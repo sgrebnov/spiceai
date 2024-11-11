@@ -136,6 +136,8 @@ insta.workspace = true
 scopeguard = "1.2.0"
 spice-cloud = { path = "../spice_cloud" }
 tracing-subscriber.workspace = true
+tracing-opentelemetry.workspace = true
+opentelemetry_sdk = { workspace = true, features = ["rt-tokio-current-thread"] }
 
 [features]
 aws-secrets-manager = [
