@@ -3504,10 +3504,11 @@ dependencies = [
 [[package]]
 name = "datafusion-table-providers"
 version = "0.1.0"
-source = "git+https://github.com/datafusion-contrib/datafusion-table-providers.git?rev=df4bab1ed474dbb432eeacb202176127d3fb2e36#df4bab1ed474dbb432eeacb202176127d3fb2e36"
+source = "git+https://github.com/datafusion-contrib/datafusion-table-providers.git?rev=ebf7a6d707f399649adf0192f2ee781a5e1386c3#ebf7a6d707f399649adf0192f2ee781a5e1386c3"
 dependencies = [
  "arrow",
  "arrow-json 53.2.0",
+ "arrow-schema",
  "async-stream",
  "async-trait",
  "bb8",
@@ -3534,6 +3535,7 @@ dependencies = [
  "rusqlite",
  "sea-query",
  "secrecy",
+ "serde",
  "serde_json",
  "snafu",
  "time",
