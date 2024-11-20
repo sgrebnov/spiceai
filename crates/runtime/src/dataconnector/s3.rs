@@ -33,10 +33,10 @@ use url::Url;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
-    #[snafu(display("No AWS access secret provided for credentials"))]
+    #[snafu(display("The S3 authentication method was set to `key`, but no AWS access secret was provided for credentials.\nSpecify an access secret with the `s3_secret` parameter.\nFor further information, visit: https://docs.spiceai.org/components/data-connectors/s3#auth"))]
     NoAccessSecret,
 
-    #[snafu(display("No AWS access key provided for credentials"))]
+    #[snafu(display("The S3 authentication method was set to `key`, but no AWS access key was provided for credentials.\nSpecify an access key with the `s3_key` parameter.\nFor further information, visit: https://docs.spiceai.org/components/data-connectors/s3#auth"))]
     NoAccessKey,
 
     #[snafu(display("Unable to parse URL {url}: {source}"))]
@@ -45,16 +45,16 @@ pub enum Error {
         source: url::ParseError,
     },
 
-    #[snafu(display("Unsupported S3 authentication method '{method}', supported methods are: 'public' (i.e. no auth), 'iam_role', and 'key'."))]
+    #[snafu(display("The S3 authentication method '{method}' is not supported.\nUpdate the `s3_auth` parameter to use the supported `s3_auth` modes of 'public' (i.e. no auth), 'iam_role', or 'key'.\nFor further information, visit: https://docs.spiceai.org/components/data-connectors/s3#auth"))]
     UnsupportedAuthenticationMethod { method: String },
 
     #[snafu(display(
-        "The 's3_key' parameter cannot be set unless the `s3_auth` parameter is set to 'key'."
+        "The '{parameter}' parameter cannot be set unless the `s3_auth` parameter is set to '{auth}'.\nFor further information, visit: https://docs.spiceai.org/components/data-connectors/s3#auth"
     ))]
-    InvalidKeyAuthCombination,
+    InvalidAuthParameterCombination { parameter: String, auth: String },
 
     #[snafu(display(
-        "The 's3_endpoint' parameter must be a HTTP/S URL, but '{endpoint}' was provided."
+        "The 's3_endpoint' parameter must be a HTTP/S URL, but '{endpoint}' was provided.\nFor further information, visit: https://docs.spiceai.org/components/data-connectors/s3#params"
     ))]
     InvalidEndpoint { endpoint: String },
 }
@@ -131,20 +131,43 @@ impl DataConnectorFactory for S3Factory {
                 }
             }
 
-            if let Some(auth) = params.parameters.get("auth").expose().ok() {
-                if auth != "public" && auth != "iam_role" && auth != "key" {
+            match params.parameters.get("auth").expose().ok() {
+                None | Some("public" | "iam_role") => {
+                    if matches!(params.parameters.get("key"), ParamLookup::Present(_)) {
+                        // The 's3_key' parameter cannot be set unless the `s3_auth` parameter is set to 'key'.
+                        return Err(Box::new(Error::InvalidAuthParameterCombination {
+                            parameter: "s3_key".to_string(),
+                            auth: "key".to_string(),
+                        })
+                            as Box<dyn std::error::Error + Send + Sync>);
+                    }
+                    if matches!(params.parameters.get("secret"), ParamLookup::Present(_)) {
+                        // The 's3_secret' parameter cannot be set unless the `s3_auth` parameter is set to 'key'.
+                        return Err(Box::new(Error::InvalidAuthParameterCombination {
+                            parameter: "s3_secret".to_string(),
+                            auth: "key".to_string(),
+                        })
+                            as Box<dyn std::error::Error + Send + Sync>);
+                    }
+                }
+                Some("key") => {
+                    if matches!(params.parameters.get("key"), ParamLookup::Absent(_)) {
+                        return Err(Box::new(Error::NoAccessKey)
+                            as Box<dyn std::error::Error + Send + Sync>);
+                    }
+                    if matches!(params.parameters.get("secret"), ParamLookup::Absent(_)) {
+                        return Err(Box::new(Error::NoAccessSecret)
+                            as Box<dyn std::error::Error + Send + Sync>);
+                    }
+                }
+                Some(auth) => {
                     return Err(Box::new(Error::UnsupportedAuthenticationMethod {
                         method: auth.to_string(),
                     })
                         as Box<dyn std::error::Error + Send + Sync>);
                 }
+            };
 
-                if matches!(params.parameters.get("key"), ParamLookup::Present(_)) && auth != "key"
-                {
-                    return Err(Box::new(Error::InvalidKeyAuthCombination)
-                        as Box<dyn std::error::Error + Send + Sync>);
-                }
-            }
             let s3 = S3 {
                 params: params.parameters,
             };
