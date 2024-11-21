@@ -23,7 +23,7 @@ use crate::{
     dataconnector::{
         self,
         localpod::{LocalPodConnector, LOCALPOD_DATACONNECTOR},
-        DataConnector, DataConnectorParams,
+        DataConnector, DataConnectorParams, DataConnectorParamsBuilder,
     },
     embeddings::connector::EmbeddingConnector,
     federated_table::FederatedTable,
@@ -168,29 +168,29 @@ impl Runtime {
         let spaced_tracer = Arc::clone(&self.spaced_tracer);
 
         let source = ds.source();
-        let params = DataConnectorParams::from_dataset(self, Arc::clone(&ds))
+        let params = DataConnectorParamsBuilder::new(source.clone().into(), (&ds).into())
+            .with_runtime(self)
             .await
             .context(UnableToInitializeDataConnectorSnafu)?;
 
-        let data_connector: Arc<dyn DataConnector> =
-            match self.get_dataconnector_from_source(&source, params).await {
-                Ok(data_connector) => data_connector,
-                Err(err) => {
-                    let ds_name = &ds.name;
-                    self.status
-                        .update_dataset(ds_name, status::ComponentStatus::Error);
-                    metrics::datasets::LOAD_ERROR.add(1, &[]);
-                    warn_spaced!(
-                        spaced_tracer,
-                        "Error initializing dataset {}. {err}",
-                        ds_name.table()
-                    );
-                    return UnableToLoadDatasetConnectorSnafu {
-                        dataset: ds.name.clone(),
-                    }
-                    .fail();
-                }
-            };
+        let data_connector: Arc<dyn DataConnector> = match self
+            .get_dataconnector_from_source(&source, params)
+            .await
+        {
+            Ok(data_connector) => data_connector,
+            Err(err) => {
+                let ds_name = &ds.name;
+                self.status
+                    .update_dataset(ds_name, status::ComponentStatus::Error);
+                metrics::datasets::LOAD_ERROR.add(1, &[]);
+                warn_spaced!(
+                    spaced_tracer,
+                    "Error initializing dataset {}. {err}",
+                    ds_name.table()
+                );
+                return Err(crate::Error::UnableToInitializeDataConnector { source: err.into() });
+            }
+        };
 
         Ok(data_connector)
     }
