@@ -59,6 +59,14 @@ impl Runtime {
         };
 
         let valid_datasets = Self::get_valid_datasets(app, LogErrors(true));
+
+        if valid_datasets.is_empty() {
+            tracing::info!(
+                "No datasets were configured. If this is unexpected, check the Spicepod configuration."
+            );
+            return;
+        }
+
         let initialized_datasets = self.initialize_accelerators(&valid_datasets).await;
 
         // Create a map of dataset names to their futures
