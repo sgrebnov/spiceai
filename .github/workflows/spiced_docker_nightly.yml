@@ -9,7 +9,8 @@ on:
       publish:
         description: Publish the Docker images to the registry
         required: false
-        default: "false"
+        type: boolean
+        default: false
 
 jobs:
   check_commits:
@@ -152,7 +153,7 @@ jobs:
 
   publish:
     needs: [check_commits, setup, build-amd64, build-arm64]
-    if: needs.check_commits.outputs.has_new_commits == 'true' && (github.event_name == 'schedule' || inputs.publish == 'true')
+    if: needs.check_commits.outputs.has_new_commits == 'true' && (github.event_name == 'schedule' || inputs.publish)
 
     runs-on: ubuntu-latest
     steps:
@@ -175,7 +176,7 @@ jobs:
           docker run -d -p 5000:5000 --restart=always --name registry registry:2
 
       - name: Login to GitHub Package Registry
-        if: github.event_name == 'schedule' || inputs.publish == 'true'
+        if: github.event_name == 'schedule' || inputs.publish
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -185,7 +186,7 @@ jobs:
       - name: Import images and create manifests
         env:
           REL_VERSION: ${{ needs.setup.outputs.rel_version }}
-          PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish == 'true' }}
+          PUBLISH: ${{ github.event_name == 'schedule' || inputs.publish }}
         run: |
           echo "REL_VERSION=${REL_VERSION}"
           echo "PUBLISH=${PUBLISH}"
@@ -199,10 +200,13 @@ jobs:
             # Load both architecture images
             echo "Loading AMD64 image"
             docker load -i /tmp/images-amd64/image-amd64-${variant}.tar
+            echo "Loading ARM64 image"
+            docker load -i /tmp/images-arm64/image-arm64-${variant}.tar
 
             # Push images to local registry
             echo "Pushing images to local registry"
             docker push localhost:5000/spiceai:${variant}-amd64
+            docker push localhost:5000/spiceai:${variant}-arm64
 
             if [[ "${PUBLISH}" == "true" ]]; then
               # Push to GitHub Container Registry
@@ -211,6 +215,7 @@ jobs:
                 -t ghcr.io/spiceai/spiceai-nightly:${REL_VERSION}${suffix} \
                 -t ghcr.io/spiceai/spiceai-nightly:latest${suffix} \
                 localhost:5000/spiceai:${variant}-amd64
+                localhost:5000/spiceai:${variant}-arm64
 
               echo "Verifying GHCR image:"
               docker buildx imagetools inspect ghcr.io/spiceai/spiceai-nightly:${REL_VERSION}${suffix}
@@ -220,13 +225,19 @@ jobs:
               docker buildx imagetools create \
                 -t localhost:5000/spiceai:latest${suffix} \
                 localhost:5000/spiceai:${variant}-amd64
+                localhost:5000/spiceai:${variant}-arm64
 
               docker buildx imagetools inspect localhost:5000/spiceai:latest${suffix}
             fi
           done
 
+      - uses: actions/checkout@v4
+        if: github.event_name == 'schedule' || inputs.publish
+        with:
+          fetch-depth: 0
+
       - name: Update nightly tag
-        if: github.event_name == 'schedule' || inputs.publish == 'true'
+        if: github.event_name == 'schedule' || inputs.publish
         run: |
           git tag -f nightly
           git push origin nightly --force
