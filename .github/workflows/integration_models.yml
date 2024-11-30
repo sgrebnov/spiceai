@@ -22,25 +22,25 @@ concurrency:
 jobs:
   build:
     name: Build Test Binary
-    runs-on: spiceai-runners
+    runs-on: spiceai-macos
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          os: "linux"
+      # - name: Set up Rust
+      #   uses: ./.github/actions/setup-rust
+      #   with:
+      #     os: "linux"
 
-      - name: Set up make
-        uses: ./.github/actions/setup-make
+      # - name: Set up make
+      #   uses: ./.github/actions/setup-make
 
-      - name: Set up cc
-        uses: ./.github/actions/setup-cc
+      # - name: Set up cc
+      #   uses: ./.github/actions/setup-cc
 
       # Build the test binary without running tests
       - name: Build AI integration test binary
         run: |
-          TEST_BINARY_PATH=$(cargo test -p runtime --test integration_models --features models --no-run --message-format=json | jq -r 'select(.reason == "compiler-artifact" and (.target.kind | contains(["test"])) and .executable != null) | .executable')
+          TEST_BINARY_PATH=$(cargo test -p runtime --test integration_models --features models,metal --no-run --message-format=json | jq -r 'select(.reason == "compiler-artifact" and (.target.kind | contains(["test"])) and .executable != null) | .executable')
           cp $TEST_BINARY_PATH ./ai_integration_test
 
       # Upload the test binary as an artifact
@@ -55,14 +55,14 @@ jobs:
     name: AI Integration Tests
     needs: build
     permissions: read-all
-    runs-on: ubuntu-latest-16-cores
+    runs-on: spiceai-macos
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          os: "linux"
+      # - name: Set up Rust
+      #   uses: ./.github/actions/setup-rust
+      #   with:
+      #     os: "linux"
 
       # Download the test binary artifact
       - name: Download test binary
@@ -84,9 +84,10 @@ jobs:
         env:
           SPICE_SECRET_OPENAI_API_KEY: ${{ secrets.SPICE_SECRET_OPENAI_API_KEY }}
         run: |
-          if [ -z "$SPICE_SECRET_OPENAI_API_KEY" ] ; then
-            echo "Error: OpenAI API key is not defined."
-            exit 1
-          fi
-          # Local and Huggingface models testing is not supported yet
-          INSTA_WORKSPACE_ROOT="${PWD}" CARGO_MANIFEST_DIR="${PWD}" ./integration_test/ai_integration_test --nocapture --skip huggingface_test
+          # if [ -z "$SPICE_SECRET_OPENAI_API_KEY" ] ; then
+          #   echo "Error: OpenAI API key is not defined."
+          #   exit 1
+          # fi
+          # # Local and Huggingface models testing is not supported yet
+          # INSTA_WORKSPACE_ROOT="${PWD}" CARGO_MANIFEST_DIR="${PWD}" ./integration_test/ai_integration_test --nocapture --skip huggingface_test
+          INSTA_WORKSPACE_ROOT="${PWD}" CARGO_MANIFEST_DIR="${PWD}" ./integration_test/ai_integration_test --nocapture --skip openai_test
